@@ -25,6 +25,16 @@ public class CensorshipDetector {
             System.out.println(s);
         System.out.println("-----------------ooni probe finished--------------------");
 
+
+        System.out.println("-----------------Manual Check Starting-----------------");
+        Process nmapProbe = Runtime.getRuntime().exec("nmap -sU -p 53 --script=dns-recursion "+webAddress);
+        reader = new BufferedReader(new InputStreamReader(nmapProbe.getInputStream()));
+
+        while((s=reader.readLine())!=null){
+            System.out.println(s);
+            if(s.contains("dns-recursion: Recursion appears to be enabled"))
+                System.out.println("Recursion is enabled");
+        }
         return "Command completed";
     }
 }
