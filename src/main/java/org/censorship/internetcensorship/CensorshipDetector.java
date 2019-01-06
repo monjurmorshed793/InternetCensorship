@@ -21,6 +21,12 @@ import java.util.List;
 @ShellComponent
 public class CensorshipDetector {
 
+    private CensorshipDetectorService censorshipDetectorService;
+
+    public CensorshipDetector(CensorshipDetectorService censorshipDetectorService) {
+        this.censorshipDetectorService = censorshipDetectorService;
+    }
+
     @ShellMethod("Detect censorship")
     public String detectCensorship (
             @ShellOption String webAddress
@@ -28,81 +34,34 @@ public class CensorshipDetector {
         String genuineAddress = webAddress;
         if(!webAddress.contains("http"))
             webAddress = "http://".concat(webAddress);
-       /* String s;
-
-        System.out.println("-----------------ooni probe is starting-----------------");
-        Process ooniProbe = Runtime.getRuntime().exec("ooniprobe web_connectivity --url "+webAddress);
-        BufferedReader reader = new BufferedReader(new InputStreamReader(ooniProbe.getInputStream()));
-        while((s=reader.readLine())!=null)
-            System.out.println(s);
-        System.out.println("-----------------ooni probe finished--------------------");
+       // censorshipDetectorService.testOONIProbe(webAddress);
 
 
-        System.out.println("-----------------Manual Check Starting-----------------");
+        System.out.println("Censorship test starting");
 
 
-        System.out.println("Checking whether open-dns are supported or not");
-        Process nmapProbe = Runtime.getRuntime().exec("nmap -sU -p 53 --script=dns-recursion 8.8.8.8");
-        reader = new BufferedReader(new InputStreamReader(nmapProbe.getInputStream()));
+//        System.out.println("Checking whether open-dns are supported or not");
+//        Process nmapProbe = Runtime.getRuntime().exec("nmap -sU -p 53 --script=dns-recursion 8.8.8.8");
+//        reader = new BufferedReader(new InputStreamReader(nmapProbe.getInputStream()));
+//
+//        while((s=reader.readLine())!=null){
+//            System.out.println(s);
+//            if(s.contains("dns-recursion: Recursion appears to be enabled"))
+//                System.out.println("Recursion is enabled, so Open-Dns is supported");
+//        }
 
-        while((s=reader.readLine())!=null){
-            System.out.println(s);
-            if(s.contains("dns-recursion: Recursion appears to be enabled"))
-                System.out.println("Recursion is enabled, so Open-Dns is supported");
-        }
+        boolean canConnect = censorshipDetectorService.checkConnectionStatus(webAddress);
 
-        System.out.println("Checking dns based censorship");
+        /*if(canConnect)
+            return "No Censorship Is Detected. Command execution finished";*/
 
+        boolean isDnsCensorshipDetected =  censorshipDetectorService.checkDnsCensorship(genuineAddress);
 
-
-
-        try{
-            URL url = new URL(webAddress);
-            URLConnection urlConnection = url.openConnection();
-            urlConnection.connect();
-
-        }catch (MalformedURLException e){
-            System.out.println("Url is not in correct format");
-        }catch (IOException e){
-            System.out.println("Connection failed, can't open connection");
-        }
-*/
-
-
-       checkDnsCensorship(genuineAddress);
+        boolean isHttpCensorshipDetected = censorshipDetectorService.checkHttpCensorship(webAddress);
         return "Command completed";
     }
 
 
-    private void checkDnsCensorship(String webAddress) throws Exception{
-        System.out.println("Testing with ISP Dns Server");
-        String ipAddress = InetAddress.getByName(webAddress).getHostAddress();
-        System.out.println("Found Ip Address-->"+ipAddress);
-        System.out.println("Testing with opendns");
-        SimpleResolver resolver = new SimpleResolver("8.8.8.8");
-        Lookup lookup = new Lookup(webAddress);
-        lookup.setResolver(resolver);
-        Record[] results =  lookup.run();
-        List<Record> records = new ArrayList<>();
-        List<String> ipAddressOfRecords = new ArrayList<>();
-        if(results==null)
-            System.out.println("Not able to connect");
-        else{
-            records = Arrays.asList(results);
-            Collections.shuffle(records);
-            for(Record record: records){
-                System.out.println(((ARecord) record).getAddress().getHostAddress());
-                ipAddressOfRecords.add(((ARecord) record).getAddress().getHostAddress());
-            }
-        }
 
-        if(ipAddressOfRecords.contains(ipAddress))
-            System.out.println("No DNS tempering detected");
-        else
-            System.out.println("DNS tempering detected");
 
-//        System.out.println(lookup.getAnswers());
-//
-//        InetAddress address = Address.getByAddress(genuineAddress);
-    }
 }
