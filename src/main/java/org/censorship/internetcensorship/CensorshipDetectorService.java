@@ -106,9 +106,14 @@ public class CensorshipDetectorService {
     }
 
 
+    /*
+    * HTTP port---> 80
+    * HTTPS port ---> 443
+    *
+    * */
     private Map<String, String> getProxyHeaderElements(String webAddress) throws Exception{
         webAddress = webAddress.replace("http://","");
-        HttpHost proxy = new HttpHost("127.0.0.1", 8080, "http");
+        HttpHost proxy = new HttpHost("127.0.0.1", 9050, "http");
         DefaultProxyRoutePlanner routePlanner = new DefaultProxyRoutePlanner(proxy);
 
         CloseableHttpClient httpClient = HttpClients.custom()
