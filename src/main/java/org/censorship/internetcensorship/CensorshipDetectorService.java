@@ -1,5 +1,7 @@
 package org.censorship.internetcensorship;
 
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
 import com.subgraph.orchid.TorClient;
 import com.subgraph.orchid.TorInitializationListener;
 import org.apache.http.Header;
@@ -9,6 +11,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.DefaultHttpClient;
@@ -47,8 +50,15 @@ public class CensorshipDetectorService {
     public boolean  checkDnsCensorship(String webAddress) throws Exception{
         boolean isDnsCensorshipDetected = false;
         System.out.println("Testing with ISP Dns Server");
-        String ipAddress = InetAddress.getByName(webAddress).getHostAddress();
-        System.out.println("Found Ip Address-->"+ipAddress);
+        String ipAddress = "";
+        try{
+            ipAddress = InetAddress.getByName(webAddress).getHostAddress();
+            System.out.println("Found Ip Address-->"+ipAddress);
+        }catch (Exception e){
+            System.out.println("ISP DNS NO RESPONSE");
+            e.printStackTrace();
+        }
+
         System.out.println("Testing with opendns");
         SimpleResolver resolver = new SimpleResolver("8.8.8.8");
         Lookup lookup = new Lookup(webAddress);
@@ -88,14 +98,27 @@ public class CensorshipDetectorService {
 
         boolean isHttpCensorshipDetected = false;
 
-        Map<String, String> ispHeaderElements =getISPHeaderElements(webAddress);
-
-        if(ispHeaderElements.size()==0)
-            return isHttpCensorshipDetected ;
-
         Map<String, String> proxyHeaderElements  = getProxyHeaderElements(webAddress);
 
-        if(!proxyHeaderElements.equals(ispHeaderElements))
+        if(proxyHeaderElements==null){
+            System.out.println("Website or link is not accessible through proxy, it may be down or the address is changed");
+            return false;
+        }
+
+        Map<String, String> ispHeaderElements =getISPHeaderElements(webAddress);
+
+        if(ispHeaderElements==null){
+            System.out.println("TCP/IP Censorship Detected");
+            return false;
+        }
+        else if(ispHeaderElements.size()==0)
+            return isHttpCensorshipDetected ;
+
+
+        MapDifference<String, String> differenceInMaps = Maps.difference(ispHeaderElements, proxyHeaderElements);
+
+        //need to validate more
+        if(differenceInMaps.entriesInCommon().size()<1)
             isHttpCensorshipDetected = true;
         System.out.println("HTTP Censorship detection finished");
         if(isHttpCensorshipDetected)
@@ -113,7 +136,7 @@ public class CensorshipDetectorService {
     * */
     private Map<String, String> getProxyHeaderElements(String webAddress) throws Exception{
         webAddress = webAddress.replace("http://","");
-        HttpHost proxy = new HttpHost("127.0.0.1", 9050, "http");
+        HttpHost proxy = new HttpHost("200.89.125.178", 45274, "http");
         DefaultProxyRoutePlanner routePlanner = new DefaultProxyRoutePlanner(proxy);
 
         CloseableHttpClient httpClient = HttpClients.custom()
@@ -122,11 +145,17 @@ public class CensorshipDetectorService {
 
         HttpHost target = new HttpHost(webAddress, 80, "http");
         HttpGet req = new HttpGet("/");
-        CloseableHttpResponse response = httpClient.execute(target, req);
         Map<String, String>  headers = new HashMap<>();
-        for(Header header: response.getAllHeaders()){
-            headers.put(header.getName(), header.getValue());
+        try{
+            CloseableHttpResponse response  = httpClient.execute(target, req);
+            for(Header header: response.getAllHeaders()){
+                headers.put(header.getName(), header.getValue());
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+            return null;
         }
+
         return headers;
 
     }
@@ -135,13 +164,20 @@ public class CensorshipDetectorService {
         webAddress = webAddress.replace("http://", "");
         HttpHost target = new HttpHost(webAddress, 80,"http");
         HttpGet req = new HttpGet("/");
-        return httpClient.execute(target, req);
+        try{
+            return httpClient.execute(target, req);
+        }catch (HttpHostConnectException e){
+
+            return null;
+        }
     }
 
 
     private Map<String, String> getISPHeaderElements(String webAddress) throws Exception{
         org.apache.http.client.HttpClient httpClient = HttpClientBuilder.create().build();
         HttpResponse response = getHttpResponse(webAddress, httpClient);
+        if(response==null)
+            return null;
         ((CloseableHttpClient) httpClient).close();
 
         Map<String, String>  headers = new HashMap<>();
